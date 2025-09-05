@@ -1,4 +1,4 @@
-// example Jenkinsfile for Black Duck scans using the Black Duck Security Scan Plugin
+// example Jenkinsfile for Polaris scans using the Black Duck Security Scan Plugin
 // https://plugins.jenkins.io/blackduck-security-scan
 pipeline {
     agent { label 'linux64' }
@@ -7,7 +7,6 @@ pipeline {
         FULLSCAN = "${env.BRANCH_NAME ==~ /^(main|master|develop|stage|release)$/ ? 'true' : 'false'}"
         PRSCAN = "${env.CHANGE_TARGET ==~ /^(main|master|develop|stage|release)$/ ? 'true' : 'false'}"
         GITHUB_TOKEN = credentials('github-pat')
-        DETECT_PROJECT_NAME = "${env.REPO_NAME}"
     }
     tools {
         maven 'maven-3'
@@ -19,7 +18,7 @@ pipeline {
                 sh 'mvn -B package'
             }
         }
-        stage('Black Duck') {
+        stage('Polaris') {
             when {
                 anyOf {
                     environment name: 'FULLSCAN', value: 'true'
@@ -27,19 +26,23 @@ pipeline {
                 }
             }
             steps {
-                security_scan product: 'blackducksca',
-                    blackducksca_scan_failure_severities: 'BLOCKER',
-                    blackducksca_prComment_enabled: true,
-                    blackducksca_reports_sarif_create: true,
+                security_scan product: 'polaris',
+                    polaris_assessment_types: 'SAST,SCA',
+                    polaris_application_name: "chuckaude-$REPO_NAME",
+                    polaris_project_name: "$REPO_NAME",
+                    polaris_prComment_enabled: true,
+                    polaris_reports_sarif_create: true,
                     mark_build_status: 'UNSTABLE',
                     github_token: "$GITHUB_TOKEN",
+                    coverity_build_command: "mvn -B -DskipTests package",
+                    coverity_clean_command: "mvn -B clean",
                     include_diagnostics: false
             }
         }
     }
     post {
         always {
-            archiveArtifacts allowEmptyArchive: true, artifacts: '.bridge/bridge.log'
+            archiveArtifacts allowEmptyArchive: true, artifacts: '.bridge/bridge.log, .bridge/*/idir/build-log.txt'
             //zip archive: true, dir: '.bridge', zipFile: 'bridge-logs.zip'
             cleanWs()
         }
